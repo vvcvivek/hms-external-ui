@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HMS — Patients</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-brand"><i class="ti ti-building-hospital"></i> City <span>HMS</span></a>
+  <div class="nav-links">
+    <a href="index.html"        class="nav-link">Dashboard</a>
+    <a href="patients.html"     class="nav-link active">Patients</a>
+    <a href="appointments.html" class="nav-link">Appointments</a>
+    <a href="doctors.html"      class="nav-link">Doctors</a>
+    <a href="booking.html"      class="nav-link">Book appointment</a>
+  </div>
+  <div class="nav-user" onclick="Auth.logout()">
+    <div class="nav-avatar">AD</div>
+    <span>Admin</span>
+    <i class="ti ti-logout" style="font-size:14px;opacity:0.6"></i>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <h1>Patients</h1>
+    <p>Manage and view all registered patients</p>
+  </div>
+
+  <div class="search-bar">
+    <input id="search" placeholder="Search by name or ID..." oninput="filterPatients()" />
+    <select id="statusFilter" onchange="filterPatients()">
+      <option value="">All status</option>
+      <option value="Active">Active</option>
+      <option value="Admitted">Admitted</option>
+      <option value="Discharged">Discharged</option>
+      <option value="Inactive">Inactive</option>
+    </select>
+    <a href="booking.html" class="btn btn-primary">
+      <i class="ti ti-plus"></i> New appointment
+    </a>
+  </div>
+
+  <div id="count" style="font-size:12px;color:#64748b;margin-bottom:12px"></div>
+  <div id="patient-grid" class="grid-2"><div class="loading" style="grid-column:1/-1">Loading patients...</div></div>
+</div>
+
+<script src="api.js"></script>
+<script>
+guardAuth();
+
+let allPatients = [];
+
+API.getPatients().then(rows => {
+  allPatients = rows;
+  renderPatients(rows);
+}).catch(() => toast('Could not load patients', 'error'));
+
+function filterPatients() {
+  const q      = document.getElementById('search').value.toLowerCase();
+  const status = document.getElementById('statusFilter').value;
+  const filtered = allPatients.filter(p => {
+    const name = `${p.First_Name__c} ${p.Last_Name__c} ${p.Name}`.toLowerCase();
+    return name.includes(q) && (!status || p.Patient_Status__c === status);
+  });
+  renderPatients(filtered);
+}
+
+function renderPatients(rows) {
+  const grid = document.getElementById('patient-grid');
+  document.getElementById('count').textContent = `${rows.length} patient${rows.length !== 1 ? 's' : ''} found`;
+
+  if (!rows.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">No patients found.</div>';
+    return;
+  }
+
+  grid.innerHTML = rows.map(p => {
+    const ini   = initials(p.First_Name__c, p.Last_Name__c);
+    const [bg, fg] = avatarColor(p.Name);
+    const age   = p.Age__c ? Math.floor(p.Age__c) + 'y' : '';
+    const doc   = p.Primary_Doctor__r ? p.Primary_Doctor__r.Name : 'No doctor assigned';
+    return `<div class="patient-card">
+      <div class="p-avatar" style="background:${bg};color:${fg}">${ini}</div>
+      <div style="flex:1;min-width:0">
+        <div class="p-name">${p.First_Name__c} ${p.Last_Name__c}</div>
+        <div class="p-meta">${p.Name} · ${p.Gender__c||''} · ${age} · ${p.Phone__c||''}</div>
+        <div class="p-meta" style="margin-top:2px"><i class="ti ti-stethoscope" style="font-size:11px"></i> ${doc}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        ${statusBadge(p.Patient_Status__c)}
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

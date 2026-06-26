@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HMS — Connecting...</title>
+<style>
+body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f0f4f8; }
+.msg { text-align: center; color: #64748b; font-size: 14px; }
+.msg h2 { color: #1a1a2e; font-size: 18px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="msg">
+  <h2>Connecting to Salesforce...</h2>
+  <p>Please wait while we complete login.</p>
+</div>
+<script src="api.js"></script>
+<script>
+  if (Auth.handleCallback()) {
+    window.location.href = 'index.html';
+  } else {
+    document.querySelector('.msg').innerHTML = '<h2>Login failed</h2><p>Could not get access token. <a href="login.html">Try again</a></p>';
+  }
+</script>
+</body>
+</html>

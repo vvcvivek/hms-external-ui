@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HMS — Dashboard</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-brand"><i class="ti ti-building-hospital"></i> City <span>HMS</span></a>
+  <div class="nav-links">
+    <a href="index.html"        class="nav-link active">Dashboard</a>
+    <a href="patients.html"     class="nav-link">Patients</a>
+    <a href="appointments.html" class="nav-link">Appointments</a>
+    <a href="doctors.html"      class="nav-link">Doctors</a>
+    <a href="booking.html"      class="nav-link">Book appointment</a>
+  </div>
+  <div class="nav-user" onclick="Auth.logout()">
+    <div class="nav-avatar" id="userInitials">AD</div>
+    <span id="userName">Admin</span>
+    <i class="ti ti-logout" style="font-size:14px;opacity:0.6"></i>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 id="greeting">Good morning, Admin</h1>
+    <p>Here's what's happening at City Hospital today</p>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label"><i class="ti ti-users" style="font-size:14px"></i> Total patients</div>
+      <div class="kpi-value" id="kpi-patients">—</div>
+      <div class="kpi-delta up" id="kpi-patients-delta"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label"><i class="ti ti-stethoscope" style="font-size:14px"></i> Active doctors</div>
+      <div class="kpi-value" id="kpi-doctors">—</div>
+      <div class="kpi-delta" id="kpi-doctors-delta"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label"><i class="ti ti-calendar" style="font-size:14px"></i> Today's appointments</div>
+      <div class="kpi-value" id="kpi-appts">—</div>
+      <div class="kpi-delta up" id="kpi-appts-delta"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label"><i class="ti ti-file-invoice" style="font-size:14px"></i> Pending invoices</div>
+      <div class="kpi-value warn" id="kpi-invoices" style="color:#ea580c">—</div>
+      <div class="kpi-delta warn" id="kpi-invoices-delta"></div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid-2" style="margin-bottom:16px">
+    <!-- Today's Appointments -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="ti ti-calendar-event"></i> Today's appointments</span>
+        <a href="appointments.html" style="font-size:12px;color:#0A2463;text-decoration:none">View all →</a>
+      </div>
+      <div class="card-body">
+        <div id="today-appts"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- Overdue Invoices -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="ti ti-alert-circle" style="color:#ea580c"></i> Overdue invoices</span>
+        <span class="badge b-red" id="overdue-count"></span>
+      </div>
+      <div class="card-body">
+        <div id="overdue-invoices"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+guardAuth();
+
+// Greeting
+const hr = new Date().getHours();
+const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+document.getElementById('greeting').textContent = `${greet}, Admin`;
+
+// Load KPIs
+API.getDashboardStats().then(s => {
+  document.getElementById('kpi-patients').textContent  = s.totalPatients.toLocaleString();
+  document.getElementById('kpi-doctors').textContent   = s.activeDoctors;
+  document.getElementById('kpi-appts').textContent     = s.todayAppointments;
+  document.getElementById('kpi-invoices').textContent  = s.pendingInvoices;
+  document.getElementById('kpi-invoices-delta').textContent = s.pendingInvoices > 0 ? 'Needs attention' : 'All clear';
+}).catch(() => toast('Could not load stats', 'error'));
+
+// Today's Appointments
+API.getTodayAppointments().then(rows => {
+  const el = document.getElementById('today-appts');
+  if (!rows.length) { el.innerHTML = '<div class="empty">No appointments today.</div>'; return; }
+  el.innerHTML = `<table class="tbl">
+    <thead><tr><th>Patient</th><th>Doctor</th><th>Time</th><th>Status</th></tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td>${r.Patient__r.First_Name__c} ${r.Patient__r.Last_Name__c}</td>
+      <td>${r.Doctor__r.Name}</td>
+      <td>${r.Appointment_Time__c ? r.Appointment_Time__c.slice(0,5) : '—'}</td>
+      <td>${statusBadge(r.Status__c)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}).catch(() => {
+  document.getElementById('today-appts').innerHTML = '<div class="empty">Could not load appointments.</div>';
+});
+
+// Overdue Invoices
+API.getOverdueInvoices().then(rows => {
+  const el = document.getElementById('overdue-invoices');
+  document.getElementById('overdue-count').textContent = rows.length + ' overdue';
+  if (!rows.length) { el.innerHTML = '<div class="empty">No overdue invoices.</div>'; return; }
+  el.innerHTML = `<table class="tbl">
+    <thead><tr><th>Invoice</th><th>Patient</th><th>Outstanding</th><th>Overdue</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const days = daysSince(r.Due_Date__c);
+      const cls  = days > 50 ? 'b-red' : 'b-orange';
+      return `<tr>
+        <td>${r.Name}</td>
+        <td>${r.Patient__r.First_Name__c} ${r.Patient__r.Last_Name__c}</td>
+        <td>₹${(r.Outstanding_Balance__c||0).toLocaleString('en-IN')}</td>
+        <td><span class="badge ${cls}">${days}d</span></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}).catch(() => {
+  document.getElementById('overdue-invoices').innerHTML = '<div class="empty">Could not load invoices.</div>';
+});
+</script>
+</body>
+</html>

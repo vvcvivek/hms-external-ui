@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HMS — Book Appointment</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+.autocomplete-wrap { position: relative; }
+.autocomplete-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  background: #fff; border: 0.5px solid #e2e8f0;
+  border-radius: 8px; margin-top: 2px;
+  max-height: 200px; overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.autocomplete-item {
+  padding: 9px 12px; font-size: 13px; cursor: pointer; color: #1a1a2e;
+}
+.autocomplete-item:hover { background: #f0f4f8; }
+.autocomplete-item small { color: #64748b; font-size: 11px; }
+.success-box {
+  background: #dcfce7; border: 0.5px solid #86efac;
+  border-radius: 10px; padding: 24px; text-align: center;
+  display: none;
+}
+.success-box h2 { color: #166534; font-size: 18px; margin-bottom: 8px; }
+.success-box p  { color: #15803d; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-brand"><i class="ti ti-building-hospital"></i> City <span>HMS</span></a>
+  <div class="nav-links">
+    <a href="index.html"        class="nav-link">Dashboard</a>
+    <a href="patients.html"     class="nav-link">Patients</a>
+    <a href="appointments.html" class="nav-link">Appointments</a>
+    <a href="doctors.html"      class="nav-link">Doctors</a>
+    <a href="booking.html"      class="nav-link active">Book appointment</a>
+  </div>
+  <div class="nav-user" onclick="Auth.logout()">
+    <div class="nav-avatar">AD</div>
+    <span>Admin</span>
+    <i class="ti ti-logout" style="font-size:14px;opacity:0.6"></i>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <h1>Book appointment</h1>
+    <p>Schedule a new appointment for a patient</p>
+  </div>
+
+  <div style="max-width:580px">
+
+    <!-- Success message -->
+    <div class="success-box" id="success-box">
+      <div style="font-size:32px;margin-bottom:8px">✓</div>
+      <h2>Appointment booked!</h2>
+      <p id="success-msg"></p>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:16px">
+        <button class="btn btn-primary" onclick="resetForm()">Book another</button>
+        <a href="appointments.html" class="btn btn-outline">View all appointments</a>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="card" id="booking-form">
+      <div class="card-header">
+        <span class="card-title"><i class="ti ti-calendar-plus"></i> Appointment details</span>
+      </div>
+      <div class="card-body">
+
+        <!-- Patient search -->
+        <div class="form-row" style="margin-bottom:14px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">Patient *</label>
+            <div class="autocomplete-wrap">
+              <input id="patient-search" placeholder="Type patient name to search..." oninput="searchPatient()" autocomplete="off"/>
+              <div class="autocomplete-list" id="patient-list" style="display:none"></div>
+            </div>
+            <input type="hidden" id="patient-id"/>
+            <div id="patient-selected" style="font-size:12px;color:#16a34a;margin-top:4px"></div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">Doctor *</label>
+            <select id="doctor-select">
+              <option value="">Select doctor...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Date *</label>
+            <input type="date" id="appt-date" min="" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time *</label>
+            <select id="appt-time">
+              <option value="09:00:00">09:00 AM</option>
+              <option value="10:00:00">10:00 AM</option>
+              <option value="11:00:00">11:00 AM</option>
+              <option value="12:00:00">12:00 PM</option>
+              <option value="14:00:00">02:00 PM</option>
+              <option value="15:00:00">03:00 PM</option>
+              <option value="16:00:00">04:00 PM</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Type *</label>
+            <select id="appt-type">
+              <option value="New Visit">New Visit</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Emergency">Emergency</option>
+              <option value="Telemedicine">Telemedicine</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Token number</label>
+            <input id="token" type="number" placeholder="Auto-assigned" />
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Reason for visit</label>
+          <textarea id="reason" placeholder="Brief description of the patient's symptoms or purpose of visit..."></textarea>
+        </div>
+
+        <button class="btn btn-primary btn-full" onclick="bookAppointment()">
+          <i class="ti ti-calendar-check"></i> Confirm booking
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+guardAuth();
+
+// Set min date to today
+document.getElementById('appt-date').min = new Date().toISOString().split('T')[0];
+
+// Load doctors
+API.getDoctors().then(docs => {
+  const sel = document.getElementById('doctor-select');
+  docs.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.Id;
+    opt.textContent = `${d.Name} — ${d.Specialization__c||d.Department__c||'General'}`;
+    sel.appendChild(opt);
+  });
+});
+
+// Patient autocomplete
+let searchTimeout;
+function searchPatient() {
+  clearTimeout(searchTimeout);
+  const q = document.getElementById('patient-search').value.trim();
+  const list = document.getElementById('patient-list');
+  if (q.length < 2) { list.style.display = 'none'; return; }
+
+  searchTimeout = setTimeout(() => {
+    API.searchPatients(q).then(rows => {
+      if (!rows.length) { list.style.display = 'none'; return; }
+      list.innerHTML = rows.map(p =>
+        `<div class="autocomplete-item" onclick="selectPatient('${p.Id}','${p.First_Name__c} ${p.Last_Name__c}','${p.Name}')">
+          ${p.First_Name__c} ${p.Last_Name__c}
+          <small>&nbsp;·&nbsp;${p.Name} · ${p.Phone__c||''}</small>
+        </div>`
+      ).join('');
+      list.style.display = 'block';
+    });
+  }, 300);
+}
+
+function selectPatient(id, name, pid) {
+  document.getElementById('patient-id').value = id;
+  document.getElementById('patient-search').value = name;
+  document.getElementById('patient-selected').textContent = `✓ ${pid} selected`;
+  document.getElementById('patient-list').style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.autocomplete-wrap'))
+    document.getElementById('patient-list').style.display = 'none';
+});
+
+// Book
+async function bookAppointment() {
+  const patientId = document.getElementById('patient-id').value;
+  const doctorId  = document.getElementById('doctor-select').value;
+  const date      = document.getElementById('appt-date').value;
+  const time      = document.getElementById('appt-time').value;
+  const type      = document.getElementById('appt-type').value;
+  const token     = document.getElementById('token').value;
+  const reason    = document.getElementById('reason').value;
+
+  if (!patientId) { toast('Please select a patient', 'error'); return; }
+  if (!doctorId)  { toast('Please select a doctor', 'error'); return; }
+  if (!date)      { toast('Please select a date', 'error'); return; }
+
+  const btn = document.querySelector('.btn-full');
+  btn.textContent = 'Booking...';
+  btn.disabled = true;
+
+  try {
+    await API.createAppointment({
+      Patient__c:          patientId,
+      Doctor__c:           doctorId,
+      Appointment_Date__c: date,
+      Appointment_Time__c: time,
+      Type__c:             type,
+      Token_Number__c:     token ? parseInt(token) : null,
+      Reason_for_Visit__c: reason,
+      Status__c:           'Scheduled'
+    });
+
+    document.getElementById('booking-form').style.display = 'none';
+    const box = document.getElementById('success-box');
+    box.style.display = 'block';
+    document.getElementById('success-msg').textContent =
+      `Appointment on ${new Date(date).toLocaleDateString('en-IN',{day:'numeric',month:'long'})} at ${time.slice(0,5)} has been scheduled.`;
+  } catch (e) {
+    console.error('Full error:', e);
+    toast('Booking failed: ' + e.message, 'error');
+    btn.textContent = 'Confirm booking';
+    btn.disabled = false;
+  }
+}
+
+function resetForm() {
+  document.getElementById('booking-form').style.display = 'block';
+  document.getElementById('success-box').style.display  = 'none';
+  document.getElementById('patient-id').value     = '';
+  document.getElementById('patient-search').value = '';
+  document.getElementById('patient-selected').textContent = '';
+  document.getElementById('reason').value = '';
+  document.getElementById('token').value = '';
+  const btn = document.querySelector('.btn-full');
+  btn.textContent = 'Confirm booking';
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
